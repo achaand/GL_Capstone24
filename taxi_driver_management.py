@@ -5,48 +5,26 @@ helper to the taxi ops
 import random
 
 import pymongo
-from taxi_ops_backend.custom_error import IllegalTaxiStatusState
-from taxi_ops_backend.database_management import DatabaseManagement
-from taxi_ops_backend.taxi_ops_logger import TaxiOpsLogger
-from taxi_ops_backend.model import Taxi
+from custom_error import IllegalTaxiStatusState
+from data_operations import DatabaseManagement
+from taxi_ops_logger import TaxiOpsLogger
+from model import Taxi
 
 #Added by Suraj
 from pymongo.errors import ConfigurationError, OperationFailure
 import time
 import re
-from taxi_ops_backend.database import Database
+from database import Database
 from faker import Faker
 
-# Define the boundary coordinates
-BOUNDARY_BOX = [
-    [77.491, 12.834],  # Bottom-left
-    [77.861, 12.834],  # Bottom-right
-    [77.861, 13.139],  # Top-right
-    [77.491, 13.139]   # Top-left
-]
-
-def is_within_boundary(location):
-    """
-    Check if the given location is within the specified boundary.
-    :param location: dict with 'coordinates' key, e.g., {"coordinates": [77.5, 12.9]}
-    :return: bool
-    """
-    lon, lat = location['coordinates']
-    return BOUNDARY_BOX[0][0] <= lon <= BOUNDARY_BOX[1][0] and BOUNDARY_BOX[0][1] <= lat <= BOUNDARY_BOX[2][1]
-
-
-def register_taxi(taxi_type, taxi_number, location):
+def register_taxi(taxi_type, taxi_number):
     """
     doc string
     :param taxi_type:
     :param taxi_number:
     :return:
     """
-
-    if not is_within_boundary(location):
-        raise ValueError("Location is outside the allowed boundary")
-
-    return DatabaseManagement().create_taxi(taxi_type=taxi_type, taxi_number=taxi_number, location=location)
+    return DatabaseManagement().create_taxi(taxi_type=taxi_type, taxi_number=taxi_number)
 
 # Added by Suraj
 def register_multiple_taxis_drivers(collection, data,index_key):
@@ -263,6 +241,65 @@ def book_and_initiate_trip(taxi_id, user_id, current_location, destination_locat
     return None, False
 
 
+def taxi_start_trip( taxi_id, user_id, current_location, destination_location):
+    """
+    Start a trip by updating the taxi status from 'Occupied' to 'In-Progress' and creating a trip record.
+
+    :param taxi_id: ID of the taxi
+    :param user_id: ID of the user
+    :param current_location: Current location of the user
+    :param destination_location: Destination location of the user
+    :return: Tuple containing trip_id and success status
+    """
+    logger = TaxiOpsLogger()
+
+    # Check if the taxi is available
+    current_status = DatabaseManagement().get_taxi_current_status(taxi_id)
+    if current_status != "Occupied":
+        raise IllegalTaxiStatusState(f"Taxi is in status {current_status}, should be in the Occupied Status")
+
+    # Update taxi status to "Occupied"
+    b_success = DatabaseManagement().update_taxi_status(taxi_id, "In-Progress")
+    if b_success:
+
+        # Update taxi location destination location
+        DatabaseManagement().update_taxi_location(taxi_id, destination_location)
+        logger.info("Taxi movement to destination %s - completed", destination_location)
+
+        # Update taxi location destination location
+        DatabaseManagement().update_user_location(user_id, destination_location)
+        logger.info("User movement to destination %s - completed", destination_location)
+
+        if b_success:
+            logger.info("Marking trip - %s in progress")
+            return b_success
+        return b_success
+    return None, False
+
+def taxi_end_trip(taxi_id, user_id, current_location, destination_location):
+    """
+    Start a trip by updating the taxi status from 'In-Progress' to 'Available' and creating a trip record.
+
+    :param taxi_id: ID of the taxi
+    :param user_id: ID of the user
+    :param current_location: Current location of the user
+    :param destination_location: Destination location of the user
+    :return: Tuple containing trip_id and success status
+    """
+    logger = TaxiOpsLogger()
+
+    # Check if the taxi is available
+    current_status = DatabaseManagement().get_taxi_current_status(taxi_id)
+    if current_status != "In-Progress":
+        raise IllegalTaxiStatusState(f"Taxi is in status {current_status}, should be in the In-Progress Status")
+
+    # Update taxi status to "Occupied"
+    b_success = DatabaseManagement().update_taxi_status(taxi_id, "Available")
+    if b_success:
+        logger.info("Marking trip - %s to end and making taxi as Available")
+        return b_success
+    return None, False
+
 def insert_trip_info_detail(trip_id, location, expected_time_for_completion):
     """
     insert trip info detail
@@ -309,7 +346,7 @@ def generate_random_taxi_number():
     return f"KA{random.randint(1, 99)}-{random.randint(1000, 9999)}"
 
 # Added by Suraj
-def test_create_50_taxis(count, taxi_type, taxi_number):
+def test_create_50_taxis(count, taxi_type, taxi_number, location):
     taxi_types = ["Basic", "Deluxe", "Luxury"]
 
     # Create 50 taxi data entries
@@ -318,7 +355,7 @@ def test_create_50_taxis(count, taxi_type, taxi_number):
             "taxi_type": taxi_type if taxi_type else random.choice(taxi_types),
             "taxi_number": taxi_number if taxi_number else generate_random_taxi_number(),
             "status": "Not Operational",
-            "location": {"type": "Point", "coordinates": generate_random_coordinates()},
+            "location": {"type": "Point", "coordinates": location if location else generate_random_coordinates()},
             "city": "Bangalore",
             "driver_id": ""
         }
@@ -332,9 +369,9 @@ def create_multiple_drivers(count):
         .create_multiple_drivers(count)
 
 # Added by Suraj
-def create_multiple_users(count):
+def create_multiple_users(count, name, email, phone, location):
     return DatabaseManagement() \
-        .create_multiple_users(count)
+        .create_multiple_users(count, name, email, phone, location)
 
 # Added by Suraj
 def filter_taxis_by_type(taxis, requested_type):
@@ -348,9 +385,6 @@ def filter_taxis_by_type(taxis, requested_type):
     if not filtered_taxis:
         raise ValueError("No taxis available of the requested type.")
     return filtered_taxis
-
-
-
 
 # Added by Suraj,, generate a random path of coordinates within the boundary:
 def taxi_simulate_random_coordinates_within_boundary(start_loc, end_loc, num_points):
@@ -366,16 +400,15 @@ def taxi_simulate_random_coordinates_within_boundary(start_loc, end_loc, num_poi
 if __name__ == "__main__":
 
     # Generate multiple taxi Added by Suraj
-
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-    data_taxis = test_create_50_taxis(count=50,taxi_type="", taxi_number="")
-    result_multiple_taxi = register_multiple_taxis_drivers("Taxis",data_taxis,"location")
+    data_taxis = test_create_50_taxis(count=10, taxi_type="", taxi_number="", location="")
+    result_multiple_taxi = register_multiple_taxis_drivers("Taxis", data_taxis, "location")
 
-    data_drivers = create_multiple_drivers(count=10)
+    data_drivers = create_multiple_drivers(count=5)
     result_multiple_drivers = register_multiple_taxis_drivers("Drivers", data_drivers, "")
     # #
-    data_multiple_users = create_multiple_users(count=5)
+    data_multiple_users = create_multiple_users(count=1, name="", email="", phone="", location="")
     result_multiple_users = register_multiple_taxis_drivers("Users", data_multiple_users, "location")
     print(result_multiple_users)
 
@@ -383,6 +416,49 @@ if __name__ == "__main__":
     set_taxis_drivers_ready()
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+#Added by Lakshmi in def section - requirement 3
+def update_user_location_every30sec(v_taxi_id,latitude_source,latitude_destination,longitude):
+    q = 1
+    while q < 100:
+        if (latitude_source + q * 0.05) < latitude_destination:
+            latitude = latitude_source + q * 0.05
+            v_location_source = {"coordinates": [latitude, longitude]}
+            #v_location_source = {'location': { 'type': "Point", 'coordinates': [latitude, longitude]}}
+            print(v_location_source)
+            result = update_taxi_location(v_taxi_id, v_location_source)
+        else:
+            print("Taxi " + v_taxi_id + " has reached the destination")
+            break
+        time.sleep(30)
+        print("tick")
+        q += 1
+
+# after if __name__ == "__main__": line add below instance
+    # register taxi
+    result = register_taxi(taxi_type="SedanZ", taxi_number="XYZ1245")
+    print(result)
+
+    # register_driver Success
+    result = register_driver(driver_name="John Doe", email_id="john@example.com", phone_number="1234567890")
+    print(result)
+
+    # register_drivers_with_taxis Success
+    result = register_drivers_with_taxis()
+    print(result)
+
+    #set_taxi_available
+    result = set_taxi_available(taxi_id="6665ba310cbb0dbd5b3cbd07")
+    #print(result)
+
+    # function to update a registered taxi position every 30 sec
+    latitude_source = 12.835
+    latitude_destination = 13.13
+    longitude = 89.11
+    v_taxi_id = "6665ba310cbb0dbd5b3cbd07"
+    v_location_source = {"coordinates": [latitude_source, longitude]}
+    #v_location_source = {"location": { "type": "Point", "coordinates": [latitude_source, longitude]}}  
+    result = update_taxi_location(v_taxi_id, v_location_source)
+    update_take_loc_ever_30_sec = update_user_location_every30sec(v_taxi_id,latitude_source, latitude_destination ,longitude )
 
 
     # register_taxi Success Object generated 664cc1a7e20bfb976d0a4000
@@ -474,17 +550,19 @@ if __name__ == "__main__":
 
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     # # SINGLE update_taxi_location SUCCESS  CHECK TAXI ID ON FAILURES
-    # v_taxi_id = "6659b32069ca166b048a7610"
-    # v_location = {"coordinates": [77.844, 12.977]}
+    # v_taxi_id = "66648440a06230189c6bb12d"
+    # # v_location = {"coordinates": [77.721, 13.034]}
+    # v_location = {"coordinates": [77.721, 13.034]}
     # result = update_taxi_location(v_taxi_id, v_location)
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     # # update_user_location SUCCESS
-    # user_id = "665076ee970c999bab2f396f"
-    # v_location = {"coordinates": [12.999, 77.999]}  # Example coordinates for New York City
-    # result = update_user_location(user_id, v_location)
+    # user_id = "66656e3d466cac2560b21a45" #
+    # # v_location = {"coordinates": [77.555, 13.037]}  # Example coordinates for New York City
+    # v_location = {"coordinates": [77.613, 12.886]}  # Example coordinates for New York City
+    result = update_user_location(user_id, v_location)
 
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     # book_and_initiate_trip SUCCESS
@@ -497,13 +575,14 @@ if __name__ == "__main__":
     # Get the user id and get the location he is now present TO BE DONE
 
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    # Find taxis
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-    # user_current_location = {"coordinates": [77.713, 12.851]}   # MANDAROTY Example coordinates
-    # destination_location = {"coordinates": [77.65, 12.97]}  # Example coordinates
-    # max_distance = 40000  # 5000 == 5 km
+    # user_current_location = {"coordinates": [12.886,77.613]}   # MANDAROTY Example coordinates
+    # destination_location = {"coordinates": [12.976, 77.653]}  # Example coordinates
+    # max_distance = 11000  # 5000 == 5 km
     # max_number_of_taxi = 10 #Keep the number same as the created Taxis
-    # requested_taxi_type = "Luxury"  # Luxury, Deluxe, Basic Example requested taxi type
-    # user_id = "665c6ffda0400c9e207dd1f6"
+    # requested_taxi_type = "luxury"  # luxury, deluxe, basic Example requested taxi type
+    # user_id = "66642e313f18ecdfbe285574"
     # nearest_taxis = find_nearest_taxi(user_current_location, max_distance, max_number_of_taxi)
     # for taxi in nearest_taxis:
     #     print(taxi.taxi_id, "--", taxi.taxi_type, "", taxi.status)
@@ -529,8 +608,13 @@ if __name__ == "__main__":
     #     # taxi_id = nearest_taxis[0]['taxi_id']
     #     print("Finally selectable available Taxi Type for booking")
     #     print(filtered_taxis_type[0].taxi_id, "---", filtered_taxis_type[0].taxi_type, "===" , filtered_taxis_type[0].status)
+    #     # Interchange coordinates to [longitude, latitude] for MogoDB
+    #     latitude, longitude = user_current_location['coordinates']
+    #     user_current_location['coordinates'] = [longitude, latitude]
+    #     latitude, longitude = destination_location['coordinates']
+    #     destination_location['coordinates'] = [longitude, latitude]
     #     book_and_initiate_trip(taxi_id, user_id, user_current_location, destination_location)
-
+    #
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     # ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
@@ -543,4 +627,7 @@ if __name__ == "__main__":
     # expected_time_for_completion = '2023-10-01T11:00:00Z'
     # # Call the function
     # result = insert_trip_info_detail(trip_id, location, expected_time_for_completion)
+
+    
+
 

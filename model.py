@@ -104,7 +104,7 @@ class Taxi:  # pylint: disable=too-few-public-methods
 
         return {"taxi_type": self.taxi_type, "taxi_number": self.taxi_number,
                 "status": self.status, "driver_id": self.driver_id,
-                "location": geojson_point}
+                "location": geojson_point, "taxi_id": self.taxi_id}
 
 
 # @dataclass

@@ -11,33 +11,16 @@ from pymongo import MongoClient
 from pymongo.errors import ConfigurationError
 from pymongo.typings import _Pipeline
 
-from taxi_ops_backend.taxi_ops_logger import TaxiOpsLogger
-
+from taxi_ops_logger import TaxiOpsLogger
 
 class Database:
     """
     Class for DB operations
     """
-    # Class variables used for database host ip and port information, database name
-    # variables are referred to by using <class_name>.<variable_name>
-    # AK_URI = "mongodb+srv://apache_abhinav_official:6g6RRf2UZiJy8G2" \
-    #          "@taxiops.jdfqcmn.mongodb.net/?retryWrites=true&w=majority"
-    # AK_DB_NAME = 'TaxiOps'
-    # _instance = None initially
-    # _db_conn = database connection client
-    # _db = database
-    # _logger = applevel logger
-
-   # DB_URI = "mongodb+srv://iitmcloudfeb22g1:iitmcloudfeb22g1@spn.xqzqo3y.mongodb.net/ " \
-   #          "?retryWrites=true&w=majority"
-
-    # DB_URI = "mongodb://adminuser:<insertYourPassword>@docdb-2024-05-16-11-22-24.cluster-cw6d27j9m09a.us-east-1.docdb.amazonaws.com:27017/" \
-    #         "?retryWrites=false"
-
     # DB_URI = "mongodb://localhost:27017"
     DB_URI = "mongodb+srv://mogodbcloud:UYWhDW9VEOoYoEjf@mongodbcloudcluster.1l4vovv.mongodb.net/" \
             "?retryWrites=false"
-    DB_NAME = 'ProjectTaxi'
+    DB_NAME = 'TaxiCoOp'
     _instance = None
     _db_conn = MongoClient(DB_URI,tlsCAFile=certifi.where())
     _db = _db_conn[DB_NAME]

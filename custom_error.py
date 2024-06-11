@@ -1,5 +1,5 @@
 """Module for exception class"""
-from taxi_ops_backend.taxi_ops_logger import TaxiOpsLogger
+from taxi_ops_logger import TaxiOpsLogger
 
 
 class IllegalTaxiStatusState(Exception):

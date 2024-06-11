@@ -1,5 +1,5 @@
 import json
-from taxi_ops_backend.database_management import DatabaseManagement
+from data_operations import DatabaseManagement
 
 def register_user(name, email_id, phone_number) -> str:
     """

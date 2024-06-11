@@ -1,7 +1,7 @@
 """This is the service layer which is exposed using API gateway.
 This should go in lambda
 """
-from taxi_ops_backend.database_management import DatabaseManagement
+from data_operations import DatabaseManagement
 
 
 def register_user(name, email_id, phone_number) -> str:

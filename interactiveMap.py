@@ -4,11 +4,11 @@ import certifi
 import time
 from folium.plugins import TimestampedGeoJson
 
-# MongoDB connection
+# MongoDB connection File Created by SUraj
 DB_URI = "mongodb+srv://mogodbcloud:UYWhDW9VEOoYoEjf@mongodbcloudcluster.1l4vovv.mongodb.net/" \
             "?retryWrites=false"
 client = MongoClient(DB_URI,tlsCAFile=certifi.where())
-db = client["ProjectTaxi"]
+db = client["TaxiCoOp"]
 
 # Collections
 taxis_collection = db["Taxis"]
@@ -49,7 +49,7 @@ type_color_mapping = {
     'luxury': 'white'  # White # Luxury service taxis
 }
 
-# Add taxi locations
+# Add taxi locations File created by SUraj
 for taxi in taxis:
     location = taxi.get('location', {})
     if isinstance(location, dict):
@@ -68,7 +68,7 @@ for taxi in taxis:
                         <b>Status:</b> {taxi.get('status', 'N/A')}<br>
                         <b>Type:</b> {taxi.get('taxi_type', 'N/A')}<br>
                         <b>Driver:</b> {taxi.get('driver_id', 'N/A')}<br>
-                        <b>Coordinates:</b> {longitude}, {latitude}
+                        <b>Coordinates:</b> {latitude}, {longitude}
                         """
             # popup = folium.Popup(folium.IFrame(popup_html, width=300, height=150), max_width=300)
             popup = folium.Popup(popup_html, max_width=300)
@@ -114,7 +114,7 @@ for user in users:
             popup_html = f"""
                        <b>User ID:</b> {user.get('_id', 'N/A')}<br>
                        <b>Name:</b> {user.get('user_name', 'N/A')}<br>
-                       <b>Coordinates:</b> {longitude}, {latitude}
+                       <b>Coordinates:</b> {latitude},{longitude}
                        """
             popup = folium.Popup(popup_html, max_width=300)
 

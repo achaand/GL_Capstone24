@@ -1,5 +1,5 @@
-from taxi_ops_backend.database import Database
-from taxi_ops_backend.database_management import DatabaseManagement
+from database import Database
+from data_operations import DatabaseManagement
 
 db_management = DatabaseManagement()
 
